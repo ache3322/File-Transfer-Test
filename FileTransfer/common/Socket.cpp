@@ -11,7 +11,6 @@
 #include "Socket.h"
 
 
-
 //=============================
 // CONSTRUCTOR / DESTRUCTOR
 //=============================
@@ -47,9 +46,10 @@ Socket::~Socket()
 * \param None
 * \return None
 */
-bool Socket::InitializeSocket(void)
+bool InitializeSocket(void)
 {
 	int iResult = 0;
+	WSADATA wsaData;
 
 	iResult = WSAStartup(0x202, &wsaData);
 	if (iResult != 0)
@@ -69,7 +69,7 @@ bool Socket::InitializeSocket(void)
 * \param None
 * \return int : A WSA code signifying if WSA was cleaned.
 */
-int Socket::ShutdownSocket(void)
+int ShutdownSocket(void)
 {
 	return WSACleanup();
 }
@@ -99,9 +99,17 @@ bool Socket::Open(unsigned int port)
 	}
 
 	// Bind the socket
+
 	address.sin_family = AF_INET;
 	address.sin_addr.s_addr = INADDR_ANY;
 	address.sin_port = htons(port);
+
+	if (::bind(socket, (const sockaddr*)&address, sizeof(sockaddr_in)) < 0)
+	{
+		printf("failed to bind socket\n");
+		Close();
+		return false;
+	}
 
 	// Set the socket to non-blocking
 	DWORD mode = 1;

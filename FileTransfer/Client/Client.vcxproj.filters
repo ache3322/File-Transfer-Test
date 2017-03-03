@@ -18,19 +18,22 @@
     <ClCompile Include="clientMain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Socket.cpp">
+    <ClCompile Include="..\common\Address.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Address.cpp">
+    <ClCompile Include="..\common\Connection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PacketQueue.cpp">
+    <ClCompile Include="..\common\PacketQueue.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Connection.cpp">
+    <ClCompile Include="..\common\ReliabilitySystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ReliabilitySystem.cpp">
+    <ClCompile Include="..\common\ReliableConnection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\Socket.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -38,19 +41,25 @@
     <ClInclude Include="Client.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Socket.h">
+    <ClInclude Include="..\common\Connection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Address.h">
+    <ClInclude Include="..\common\PacketQueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="PacketQueue.h">
+    <ClInclude Include="..\common\ReliabilitySystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Connection.h">
+    <ClInclude Include="..\common\ReliableConnection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ReliabilitySystem.h">
+    <ClInclude Include="..\common\Socket.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\Address.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\FlowControl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

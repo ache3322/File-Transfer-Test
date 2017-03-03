@@ -1,14 +1,12 @@
 /*
 * PROJECT		: IAD - Assignment 2 - File Transfer
-* FILE			: clientMain.cpp
+* FILE			: main.cpp
 * PROGRAMMER	: Austin Che
 * DATE			: 2017/02/28
-* DESCRIPTION	: This is the main-entry point for the Client application.
+* DESCRIPTION	: This is the main-entry point for the Server application.
 */
 #include <stdio.h>
 #include <stdlib.h>
-#include <fstream>
-#include <iostream>
 #include "..\common\ReliableConnection.h"
 #include "..\common\FlowControl.h"
 using namespace std;
@@ -19,41 +17,10 @@ const int kServerPort = 30008;
 const int kClientPort = 30009;
 const int kProtocolId = 0x11223344;
 
-struct S {
-	char a[256 + 1];
-};
-
-void ReadBytes(string fileName);
-
 
 int main(int argc, char* argv[])
 {
-	// NOTE: Argument count can be 3 or 4 (if port specificed)
-	//	int argCount = argc;
-	//
-	//	if (argCount == 4)
-	//	{
-	//		// Once the required arguments are given, instantiate a Client object
-	//		// The Client object will take in the ip, port, and file
-	//	}
-	//	else
-	//	{
-	//		printf("Usage : Client.exe <ip_address> <port> <file>\n");
-	//		printf("  ip_address - IPv4 address to the host server\n");
-	//		printf("  port - The port number\n");
-	//		printf("  file - The file to be transferred to the server\n");
-	//	}
-	//
-	//#ifdef _WIN32
-	//	system("pause");
-	//	getchar();
-	//#endif
-	//	return 0;
-
-	ReadBytes("test");
-	return 0;
-
-// parse command line
+	// parse command line
 
 	enum Mode
 	{
@@ -70,7 +37,6 @@ int main(int argc, char* argv[])
 		if (sscanf_s(argv[1], "%d.%d.%d.%d", &a, &b, &c, &d))
 		{
 			mode = Client;
-			// Here is where the Client is connecting to the "Server Port"
 			address = Address(a, b, c, d, kServerPort);
 		}
 	}
@@ -85,16 +51,7 @@ int main(int argc, char* argv[])
 
 	ReliableConnection connection(kProtocolId, kTimeOut);
 
-	// This port is the current application
-	int port = 0;
-	if (mode == Server)
-	{
-		port = kServerPort;
-	}
-	else
-	{
-		port = kClientPort;
-	}
+	const int port = mode == Server ? kServerPort : kClientPort;
 
 	if (!connection.Start(port))
 	{
@@ -120,9 +77,7 @@ int main(int argc, char* argv[])
 		// update flow control
 
 		if (connection.IsConnected())
-		{
 			flowControl.Update(kDeltaTime, connection.GetReliabilitySystem().GetRoundTripTime() * 1000.0f);
-		}
 
 		const float sendRate = flowControl.GetSendRate();
 
@@ -151,7 +106,6 @@ int main(int argc, char* argv[])
 
 		sendAccumulator += kDeltaTime;
 
-		//
 		// sendRate = 1 / 30
 		// Delta = 1 / 30
 		// 
@@ -168,9 +122,7 @@ int main(int argc, char* argv[])
 			unsigned char packet[256];
 			int bytes_read = connection.ReceivePacket(packet, sizeof(packet));
 			if (bytes_read == 0)
-			{
 				break;
-			}
 		}
 
 		// show packets that were acked this frame
@@ -221,55 +173,4 @@ int main(int argc, char* argv[])
 	ShutdownSocket();
 
 	return 0;
-}
-
-
-
-void ReadBytes(string fileName)
-{
-	std::ifstream is("test.txt", std::ifstream::binary);
-
-	int bufferLength = 0;
-	char* buffer = NULL;
-
-
-	if (is) {
-		// get length of file:
-		is.seekg(0, is.end);
-		bufferLength = is.tellg();
-		is.seekg(0, is.beg);
-
-		buffer = new char[bufferLength];
-		// read data as a block:
-		is.read(buffer, bufferLength);
-
-		is.close();
-	}
-
-	struct S lol = { 0 };
-	vector<S> package;
-
-
-	int tmpCount = 0;
-	int remainder = bufferLength % 256;
-
-
-	for (int i = 0; i < bufferLength; ++i)
-	{
-		if (i % 256 == 0 && i != 0)
-		{
-			package.push_back(lol);
-			tmpCount = 0;
-			memset(lol.a, 0, 256 + 1);
-		}
-
-		lol.a[tmpCount] = buffer[i];
-		++tmpCount;
-	}
-
-
-	for each (auto var in package)
-	{
-		printf("%s\n", var.a);
-	}
 }

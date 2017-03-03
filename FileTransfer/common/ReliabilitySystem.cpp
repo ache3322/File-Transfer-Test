@@ -321,11 +321,14 @@ void ReliabilitySystem::UpdateQueues(void)
 
 void ReliabilitySystem::UpdateStats(void)
 {
-	int sent_bytes_per_second = 0;
+	float sent_bytes_per_second = 0;
 	for (PacketQueue::iterator itor = sentQueue.begin(); itor != sentQueue.end(); ++itor)
+	{
 		sent_bytes_per_second += itor->size;
-	int acked_packets_per_second = 0;
-	int acked_bytes_per_second = 0;
+	}
+
+	float acked_packets_per_second = 0;
+	float acked_bytes_per_second = 0;
 	for (PacketQueue::iterator itor = ackedQueue.begin(); itor != ackedQueue.end(); ++itor)
 	{
 		if (itor->time >= rtt_maximum)
@@ -334,6 +337,7 @@ void ReliabilitySystem::UpdateStats(void)
 			acked_bytes_per_second += itor->size;
 		}
 	}
+
 	sent_bytes_per_second /= rtt_maximum;
 	acked_bytes_per_second /= rtt_maximum;
 	sent_bandwidth = sent_bytes_per_second * (8 / 1000.0f);
