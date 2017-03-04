@@ -17,9 +17,14 @@ const int kServerPort = 30008;
 const int kClientPort = 30009;
 const int kProtocolId = 0x11223344;
 
+struct S {
+	unsigned char a[256];
+};
 
 int main(int argc, char* argv[])
 {
+	vector<S> package;
+
 	// parse command line
 
 	enum Mode
@@ -88,6 +93,7 @@ int main(int argc, char* argv[])
 			flowControl.Reset();
 			printf("reset flow control\n");
 			connected = false;
+			break;
 		}
 
 		if (!connected && connection.IsConnected())
@@ -111,8 +117,9 @@ int main(int argc, char* argv[])
 		// 
 		while (sendAccumulator > 1.0f / sendRate)
 		{
+			// Server sending back ACKs to the client
 			unsigned char packet[kPacketSize];
-			memset(packet, 0, sizeof(packet));
+			memset(packet, 'f', sizeof(packet));
 			connection.SendPacket(packet, sizeof(packet));
 			sendAccumulator -= 1.0f / sendRate;
 		}
@@ -122,23 +129,27 @@ int main(int argc, char* argv[])
 			unsigned char packet[256];
 			int bytes_read = connection.ReceivePacket(packet, sizeof(packet));
 			if (bytes_read == 0)
+			{
 				break;
-		}
+			}
+			if (bytes_read > 0)
+			{
+				if (connected == true)
+				{
+					char checker[256] = { 0 };
+					memset(checker, 'f', sizeof(checker));
+					
+					if (memcmp((packet), checker, 256) != 0)
+					{
+						struct S wol = { 0 };
+						memcpy(wol.a, packet, 256);
+						printf("Bytes read: %s | Bytes decimal: %d\n", packet, bytes_read);
 
-		// show packets that were acked this frame
-
-#ifdef SHOW_ACKS
-		unsigned int * acks = NULL;
-		int ack_count = 0;
-		connection.GetReliabilitySystem().GetAcks(&acks, ack_count);
-		if (ack_count > 0)
-		{
-			printf("acks: %d", acks[0]);
-			for (int i = 1; i < ack_count; ++i)
-				printf(",%d", acks[i]);
-			printf("\n");
+						package.push_back(wol);
+					}
+				}
+			}
 		}
-#endif
 
 		// update connection
 
@@ -171,6 +182,24 @@ int main(int argc, char* argv[])
 	}
 
 	ShutdownSocket();
+
+	int length = 0;
+	for each(auto var in package)
+	{
+		length += sizeof(var.a);
+	}
+
+	printf("Buffer Length: %d\n", length);
+
+	char* finalResult = new char[length];
+	memset(finalResult, 0, length);
+
+	for each (auto var in package)
+	{
+		strcat(finalResult, reinterpret_cast<char *>(var.a));
+	}
+	
+	delete[] finalResult;
 
 	return 0;
 }

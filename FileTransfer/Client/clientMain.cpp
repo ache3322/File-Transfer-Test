@@ -20,38 +20,16 @@ const int kClientPort = 30009;
 const int kProtocolId = 0x11223344;
 
 struct S {
-	char a[256 + 1];
+	unsigned char a[256];
 };
 
-void ReadBytes(string fileName);
+vector<S> ReadBytes(string fileName);
 
 
 int main(int argc, char* argv[])
 {
-	// NOTE: Argument count can be 3 or 4 (if port specificed)
-	//	int argCount = argc;
-	//
-	//	if (argCount == 4)
-	//	{
-	//		// Once the required arguments are given, instantiate a Client object
-	//		// The Client object will take in the ip, port, and file
-	//	}
-	//	else
-	//	{
-	//		printf("Usage : Client.exe <ip_address> <port> <file>\n");
-	//		printf("  ip_address - IPv4 address to the host server\n");
-	//		printf("  port - The port number\n");
-	//		printf("  file - The file to be transferred to the server\n");
-	//	}
-	//
-	//#ifdef _WIN32
-	//	system("pause");
-	//	getchar();
-	//#endif
-	//	return 0;
-
-	ReadBytes("test");
-	return 0;
+	vector<S> package;
+	package = ReadBytes("test");
 
 // parse command line
 
@@ -115,7 +93,8 @@ int main(int argc, char* argv[])
 
 	FlowControl flowControl;
 
-	while (true)
+	bool isExit = false;
+	while (isExit == false)
 	{
 		// update flow control
 
@@ -157,10 +136,24 @@ int main(int argc, char* argv[])
 		// 
 		while (sendAccumulator > 1.0f / sendRate)
 		{
-			unsigned char packet[kPacketSize];
-			memset(packet, 0, sizeof(packet));
-			connection.SendPacket(packet, sizeof(packet));
-			sendAccumulator -= 1.0f / sendRate;
+			// Client has connected to the server!!!
+			if (connected == true && mode == Client)
+			{
+				int length = sizeof(package[0].a);
+				connection.SendPacket(package[0].a, length);
+				connection.SendPacket(package[1].a, length);
+				sendAccumulator -= 1.0f / sendRate;
+
+				isExit = true;
+			}
+			else
+			{
+				/* SENDING ACKs to the Server */
+				unsigned char packet[kPacketSize];
+				memset(packet, 'f', sizeof(packet));
+				connection.SendPacket(packet, sizeof(packet));
+				sendAccumulator -= 1.0f / sendRate;
+			}
 		}
 
 		while (true)
@@ -194,7 +187,7 @@ int main(int argc, char* argv[])
 
 		// show connection stats
 
-		statsAccumulator += kDeltaTime;
+		//statsAccumulator += kDeltaTime;
 
 		while (statsAccumulator >= 0.25f && connection.IsConnected())
 		{
@@ -218,6 +211,7 @@ int main(int argc, char* argv[])
 		FlowControl::wait_seconds(kDeltaTime);
 	}
 
+	printf("The Client has exited the program!\n");
 	ShutdownSocket();
 
 	return 0;
@@ -225,7 +219,7 @@ int main(int argc, char* argv[])
 
 
 
-void ReadBytes(string fileName)
+vector<S> ReadBytes(string fileName)
 {
 	std::ifstream is("test.txt", std::ifstream::binary);
 
@@ -239,7 +233,8 @@ void ReadBytes(string fileName)
 		bufferLength = is.tellg();
 		is.seekg(0, is.beg);
 
-		buffer = new char[bufferLength];
+		buffer = new char[bufferLength + 1];
+		memset(buffer, 0, bufferLength + 1);
 		// read data as a block:
 		is.read(buffer, bufferLength);
 
@@ -249,27 +244,26 @@ void ReadBytes(string fileName)
 	struct S lol = { 0 };
 	vector<S> package;
 
-
 	int tmpCount = 0;
-	int remainder = bufferLength % 256;
-
-
-	for (int i = 0; i < bufferLength; ++i)
+	int i = 0;
+	for (i = 0; i < bufferLength; ++i)
 	{
-		if (i % 256 == 0 && i != 0)
+		if (i % 255 == 0 && i != 0)
 		{
 			package.push_back(lol);
 			tmpCount = 0;
-			memset(lol.a, 0, 256 + 1);
+			memset(lol.a, 0, 256);
 		}
 
 		lol.a[tmpCount] = buffer[i];
 		++tmpCount;
 	}
 
+	// Push the remaining bytes
+	package.push_back(lol);
 
-	for each (auto var in package)
-	{
-		printf("%s\n", var.a);
-	}
+
+	printf("[CL] : Buffer length: %d\n", bufferLength);
+
+	return package;
 }

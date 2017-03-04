@@ -17,7 +17,7 @@
 //=============================
 #define kDeltaTime		1.0f / 30.0f
 #define kSendRate		1.0f / 30.0f
-#define kTimeOut		10.0f
+#define kTimeOut		5.0f
 
 
 /**

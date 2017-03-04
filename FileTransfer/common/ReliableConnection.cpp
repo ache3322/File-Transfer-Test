@@ -48,6 +48,7 @@ bool ReliableConnection::SendPacket(const unsigned char data[], int size)
 	unsigned int ack_bits = reliabilitySystem.GenerateAckBits();
 	WriteHeader(packet, seq, ack, ack_bits);
 	memcpy(packet + header, data, size);
+
 	if (!Connection::SendPacket(packet, size + header)) {
 		return false;
 	}
