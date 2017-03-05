@@ -4,7 +4,9 @@
 * PROGRAMMER	: Austin Che
 * DATE			: 2017/02/28
 * DESCRIPTION	: CPP file contains the ReliableConnection implementation.
-* CREDIT		:
+* CREDIT		: https://github.com/ThisIsRobokitty/netgame/blob/master/03%20-%20Reliability%20and%20Flow%20Control/Net.h
+*		Credit to ThisIsRoboKitty for providing the source code on Gaffer on Games implementation of UDP.
+*		The source code is modified and used for experimental/educational purposes.
 */
 #include "ReliableConnection.h"
 
@@ -23,7 +25,9 @@ ReliableConnection::ReliableConnection(unsigned int protocolId, float timeout, u
 ReliableConnection::~ReliableConnection()
 {
 	if (IsRunning())
+	{
 		Stop();
+	}
 }
 
 
@@ -41,15 +45,18 @@ bool ReliableConnection::SendPacket(const unsigned char data[], int size)
 		return true;
 	}
 #endif
-	const int header = 12;
-	unsigned char * packet = new unsigned char[header + size];
+	// Packet = header (12) + size (max. 256)
+	const int kHeader = 12;
+	unsigned char * packet = new unsigned char[kHeader + size];
 	unsigned int seq = reliabilitySystem.GetLocalSequence();
 	unsigned int ack = reliabilitySystem.GetRemoteSequence();
 	unsigned int ack_bits = reliabilitySystem.GenerateAckBits();
-	WriteHeader(packet, seq, ack, ack_bits);
-	memcpy(packet + header, data, size);
 
-	if (!Connection::SendPacket(packet, size + header)) {
+	WriteHeader(packet, seq, ack, ack_bits);
+	memcpy(packet + kHeader, data, size);
+
+	if (!Connection::SendPacket(packet, size + kHeader)) 
+	{
 		return false;
 	}
 	reliabilitySystem.PacketSent(size);
@@ -61,31 +68,37 @@ bool ReliableConnection::SendPacket(const unsigned char data[], int size)
 
 int ReliableConnection::ReceivePacket(unsigned char data[], int size)
 {
-	const int header = 12;
-	if (size <= header)
+	const int kHeader = 12;
+	if (size <= kHeader)
+	{
 		return false;
-	unsigned char * packet = new unsigned char[header + size];
-	int received_bytes = Connection::ReceivePacket(packet, size + header);
+	}
+
+	unsigned char * packet = new unsigned char[kHeader + size];
+	int received_bytes = Connection::ReceivePacket(packet, size + kHeader);
 	if (received_bytes == 0)
 	{
 		delete[] packet;
-		return false;
+		return 0;
 	}
-	if (received_bytes <= header)
+	if (received_bytes <= kHeader)
 	{
 		delete[] packet;
-		return false;
+		return received_bytes - kHeader;
 	}
+
 	unsigned int packet_sequence = 0;
 	unsigned int packet_ack = 0;
 	unsigned int packet_ack_bits = 0;
+
 	ReadHeader(packet, packet_sequence, packet_ack, packet_ack_bits);
-	reliabilitySystem.PacketReceived(packet_sequence, received_bytes - header);
+	reliabilitySystem.PacketReceived(packet_sequence, received_bytes - kHeader);
 	reliabilitySystem.ProcessAck(packet_ack, packet_ack_bits);
-	memcpy(data, packet + header, received_bytes - header);
+	memcpy(data, packet + kHeader, received_bytes - kHeader);
 
 	delete[] packet;
-	return received_bytes - header;
+	// Return the received bytes (minus the header)
+	return received_bytes - kHeader;
 }
 
 
@@ -137,8 +150,11 @@ void ReliableConnection::WriteHeader(unsigned char * header, unsigned int sequen
 
 void ReliableConnection::ReadInteger(const unsigned char * data, unsigned int & value)
 {
-	value = (((unsigned int)data[0] << 24) | ((unsigned int)data[1] << 16) |
-		((unsigned int)data[2] << 8) | ((unsigned int)data[3]));
+	value = (
+		((unsigned int)data[0] << 24) 
+		| ((unsigned int)data[1] << 16) 
+		| ((unsigned int)data[2] << 8) 
+		| ((unsigned int)data[3]));
 }
 
 
@@ -160,12 +176,3 @@ void ReliableConnection::OnDisconnect(void)
 {
 	ClearData();
 }
-
-
-
-
-//=================================
-//---------------------------------
-//=======================
-// PRIVATE METHODS
-//=======================

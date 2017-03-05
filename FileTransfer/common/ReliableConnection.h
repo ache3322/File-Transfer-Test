@@ -4,7 +4,9 @@
 * PROGRAMMER	: Austin Che
 * DATE			: 2017/02/28
 * DESCRIPTION	: Header file contains the ReliableConnection class definition.
-* CREDIT		:
+* CREDIT		: https://github.com/ThisIsRobokitty/netgame/blob/master/03%20-%20Reliability%20and%20Flow%20Control/Net.h
+*		Credit to ThisIsRoboKitty for providing the source code on Gaffer on Games implementation of UDP.
+*		The source code is modified and used for experimental/educational purposes.
 */
 #include "Connection.h"
 #include "ReliabilitySystem.h"
@@ -17,6 +19,7 @@
 // CONSTANTS
 //=============================
 #define kPacketSize		256
+#define kProtocolId		0x11223344
 
 
 
@@ -28,7 +31,7 @@ class ReliableConnection : public Connection
 {
 private:
 
-	void ClearData()
+	void ClearData(void)
 	{
 		reliabilitySystem.Reset();
 	}
@@ -37,7 +40,7 @@ private:
 	unsigned int packet_loss_mask;			// mask sequence number, if non-zero, drop packet - for unit test only
 #endif
 
-	ReliabilitySystem reliabilitySystem;	// reliability system: manages sequence numbers and acks, tracks network stats etc.
+	ReliabilitySystem reliabilitySystem;	//!< reliability system: manages sequence numbers and acks, tracks network stats etc.
 
 public:
 

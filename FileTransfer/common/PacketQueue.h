@@ -4,7 +4,9 @@
 * PROGRAMMER	: Austin Che
 * DATE			: 2017/02/28
 * DESCRIPTION	: Header file contains the PacketQueue class definition.
-* CREDIT		:
+* CREDIT		: https://github.com/ThisIsRobokitty/netgame/blob/master/03%20-%20Reliability%20and%20Flow%20Control/Net.h
+*		Credit to ThisIsRoboKitty for providing the source code on Gaffer on Games implementation of UDP.
+*		The source code is modified and used for experimental/educational purposes.
 */
 #ifndef __PACKET_QUEUE_H__
 #define __PACKET_QUEUE_H__

@@ -4,7 +4,9 @@
 * PROGRAMMER	: Austin Che
 * DATE			: 2017/02/28
 * DESCRIPTION	: Header file contains the Socket class definition.
-* CREDIT		: 
+* CREDIT		: https://github.com/ThisIsRobokitty/netgame/blob/master/03%20-%20Reliability%20and%20Flow%20Control/Net.h
+*		Credit to ThisIsRoboKitty for providing the source code on Gaffer on Games implementation of UDP.
+*		The source code is modified and used for experimental/educational purposes.
 */
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <winsock2.h>
@@ -48,15 +50,6 @@ public:
 	//------------------
 	~Socket(void);
 
-
-	/*-Accessors-*/
-	//------------------
-
-
-	/*-Mutators-*/
-	//------------------
-
-
 	/*-Socket Methods-*/
 	//------------------
 	bool Open(unsigned int port);				// For opening the WinSock
@@ -64,11 +57,6 @@ public:
 
 	bool Send(const Address& dest, const void* data, int size);		// Sending the packet to the receiver
 	int Recv(Address& sender, void* data, int size);				// Receiving the packets
-
-	int SendBytes(int messageSize);
-	int RecvBytes(int& messageSize);
-
-	string GenerateError(int errorCode);
 };
 
 

@@ -3,8 +3,10 @@
 * FILENAME		: Connection.h
 * PROGRAMMER	: Austin Che
 * DATE			: 2017/02/28
-* DESCRIPTION	:
-* CREDIT		:
+* DESCRIPTION	: Header file containing the class defintion for Connection.
+* CREDIT		: https://github.com/ThisIsRobokitty/netgame/blob/master/03%20-%20Reliability%20and%20Flow%20Control/Net.h
+*		Credit to ThisIsRoboKitty for providing the source code on Gaffer on Games implementation of UDP.
+*		The source code is modified and used for experimental/educational purposes.
 */
 #ifndef __CONNECTION_H__
 #define __CONNECTION_H__
@@ -13,15 +15,20 @@
 #include "Socket.h"
 
 
-// ENUM DEFINITIONS
+//=============================
+// ENUM
+//=============================
 enum Mode
 {
 	None,
-	Client,
-	Server
+	c_Client,
+	c_Server
 };
 
 
+//=============================
+// CLASS
+//=============================
 /*!
 * \class Connection
 * \brief
@@ -57,10 +64,11 @@ private:
 
 protected:
 
-	virtual void OnStart() {}
-	virtual void OnStop() {}
-	virtual void OnConnect() {}
-	virtual void OnDisconnect() {}
+	virtual void OnStart(void) {}
+	virtual void OnStop(void) {}
+	virtual void OnConnect(void) {}
+	virtual void OnDisconnect(void) {}
+
 
 public:
 	
@@ -91,11 +99,10 @@ public:
 	bool IsConnecting(void) const;
 	bool IsConnected(void) const;
 	bool IsListening(void) const;
+	bool IsDisconnected(void) const;
 	bool ConnectFailed(void) const;
 	Mode GetMode(void) const;
 	int GetHeaderSize(void) const;
 };
-
-
 
 #endif // !__CONNECTION_H__

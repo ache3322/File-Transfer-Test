@@ -3,7 +3,7 @@
 * FILENAME		: ReliabilitySystem.cpp
 * PROGRAMMER	: Austin Che
 * DATE			: 2017/02/28
-* DESCRIPTION	:
+* DESCRIPTION	: CPP file contains the implementation for the ReliabilitySystem class.
 * CREDIT		: https://github.com/ThisIsRobokitty/netgame/blob/master/03%20-%20Reliability%20and%20Flow%20Control/Net.h
 *		Credit to ThisIsRoboKitty for providing the source code on Gaffer on Games implementation of UDP.
 *		The source code is modified and used for experimental/educational purposes.
@@ -53,19 +53,24 @@ void ReliabilitySystem::PacketSent(int size)
 	{
 		printf("local sequence %d Exists\n", local_sequence);
 		for (PacketQueue::iterator itor = sentQueue.begin(); itor != sentQueue.end(); ++itor)
+		{
 			printf(" + %d\n", itor->sequence);
+		}
 	}
+
 	assert(!sentQueue.Exists(local_sequence));
 	assert(!pendingAckQueue.Exists(local_sequence));
 	PacketData data;
 	data.sequence = local_sequence;
 	data.time = 0.0f;
 	data.size = size;
+
 	sentQueue.push_back(data);
 	pendingAckQueue.push_back(data);
 	sent_packets++;
 	local_sequence++;
-	if (local_sequence > max_sequence) {
+	if (local_sequence > max_sequence) 
+	{
 		local_sequence = 0;
 	}
 }
@@ -75,13 +80,17 @@ void ReliabilitySystem::PacketReceived(unsigned int sequence, int size)
 {
 	recv_packets++;
 	if (receivedQueue.Exists(sequence))
+	{
 		return;
+	}
+
 	PacketData data;
 	data.sequence = sequence;
 	data.time = 0.0f;
 	data.size = size;
 	receivedQueue.push_back(data);
-	if (sequence_more_recent(sequence, remote_sequence, max_sequence)) {
+	if (sequence_more_recent(sequence, remote_sequence, max_sequence))
+	{
 		remote_sequence = sequence;
 	}
 }
@@ -156,15 +165,33 @@ unsigned int ReliabilitySystem::generate_ack_bits(unsigned int ack, const Packet
 	for (PacketQueue::const_iterator itor = received_queue.begin(); itor != received_queue.end(); itor++)
 	{
 		if (itor->sequence == ack || sequence_more_recent(itor->sequence, ack, max_sequence))
+		{
 			break;
+		}
+
 		int bit_index = bit_index_for_sequence(itor->sequence, ack, max_sequence);
 		if (bit_index <= 31)
+		{
 			ack_bits |= 1 << bit_index;
+		}
 	}
 	return ack_bits;
 }
 
 
+/**
+* \brief Process the ACKs
+* \details
+* \param ack - unsigned int -
+* \param ack_bits - unsigned int -
+* \param pending_ack_queue - PacketQueue& -
+* \param acked_queue - PacketQueue& -
+* \param acks - vector<unsigned int>& -
+* \param acked_packets - unsigned int& -
+* \param rtt - float& -
+* \param max_sequence - unsigned int -
+* \return None
+*/
 void ReliabilitySystem::process_ack(unsigned int ack, unsigned int ack_bits,
 	PacketQueue & pending_ack_queue, PacketQueue & acked_queue,
 	std::vector<unsigned int> & acks, unsigned int & acked_packets,

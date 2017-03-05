@@ -11,26 +11,28 @@
 #ifndef __ADDRESS_H__
 #define __ADDRESS_H__
 
+#include <stdio.h>
+#include <string>
 
 
+
+//=============================
+// CLASS
+//=============================
 /*!
 * \class Address
-* \brief
+* \brief The class encapsulates a IPv4 address and a port.
+* \details Numerous methods allow the storage of an address. This includes 
+*	retrieval of the 4 octets in a IPv4 address.
 */
 class Address
 {
-	//=============================
-	// Private Data Members
-	//=============================
 private:
 
 	unsigned int ip;			//!< IPv4 address
 	unsigned short port;		//!< Port number
 
 
-	//=============================
-	// Public Attributes
-	//=============================
 public:
 
 	/*-Constructors-*/
@@ -38,6 +40,7 @@ public:
 	Address(void);
 	Address(unsigned char a, unsigned char b, unsigned char c, unsigned char d, unsigned short port);
 	Address(unsigned int address, unsigned short port);
+	Address(const char* address, unsigned short port);
 
 	/*-Destructors-*/
 	//------------------
@@ -51,6 +54,11 @@ public:
 	unsigned char GetC(void) const;
 	unsigned char GetD(void) const;
 	unsigned short GetPort(void) const;
+
+	/*-Validation-*/
+	//------------------
+	static bool ValidateIP(std::string& ipAddress);
+	static bool ValidateIP(char* ipAddress);
 
 	/*-Overloaded operators-*/
 	//------------------

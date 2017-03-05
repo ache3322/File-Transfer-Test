@@ -3,8 +3,10 @@
 * FILENAME		: Connection.cpp
 * PROGRAMMER	: Austin Che
 * DATE			: 2017/02/28
-* DESCRIPTION	:
-* CREDIT		:
+* DESCRIPTION	: CPP file containing the implementation for the Connection class.
+* CREDIT		: https://github.com/ThisIsRobokitty/netgame/blob/master/03%20-%20Reliability%20and%20Flow%20Control/Net.h
+*		Credit to ThisIsRoboKitty for providing the source code on Gaffer on Games implementation of UDP.
+*		The source code is modified and used for experimental/educational purposes.
 */
 #include <assert.h>
 #include "Connection.h"
@@ -27,7 +29,9 @@ Connection::Connection(unsigned int protocolId, float timeout)
 Connection::~Connection()
 {
 	if (IsRunning())
+	{
 		Stop();
+	}
 }
 
 
@@ -38,10 +42,12 @@ Connection::~Connection()
 //=======================
 bool Connection::Start(int port)
 {
-	assert(!running);
-	printf("start connection on port %d\n", port);
+	printf(">> start connection on port %d\n", port);
 	if (!socket.Open(port))
+	{
 		return false;
+	}
+
 	running = true;
 	OnStart();
 	return true;
@@ -50,13 +56,12 @@ bool Connection::Start(int port)
 
 void Connection::Stop(void)
 {
-	assert(running);
-	printf("stop connection\n");
 	bool connected = IsConnected();
 	clearData();
 	socket.Close();
 	running = false;
-	if (connected) {
+	if (connected) 
+	{
 		OnDisconnect();
 	}
 	OnStop();
@@ -65,27 +70,33 @@ void Connection::Stop(void)
 
 void Connection::Listen(void)
 {
-	printf("server listening for connection\n");
+	printf(">> server listening for connection\n");
+
 	bool connected = IsConnected();
 	clearData();
-	if (connected) {
+	if (connected) 
+	{
 		OnDisconnect();
 	}
-	mode = Server;
+
+	mode = c_Server;
 	state = Listening;
 }
 
 
 void Connection::Connect(const Address & address)
 {
-	printf("client connecting to %d.%d.%d.%d:%d\n",
+	printf(">> client connecting to %d.%d.%d.%d:%d\n",
 		address.GetA(), address.GetB(), address.GetC(), address.GetD(), address.GetPort());
+
 	bool connected = IsConnected();
 	clearData();
-	if (connected) {
+	if (connected)
+	{
 		OnDisconnect();
 	}
-	mode = Client;
+
+	mode = c_Client;
 	state = Connecting;
 	this->address = address;
 }
@@ -93,13 +104,12 @@ void Connection::Connect(const Address & address)
 
 void Connection::Update(float deltaTime)
 {
-	assert(running);
 	timeoutAccumulator += deltaTime;
 	if (timeoutAccumulator > timeout)
 	{
 		if (state == Connecting)
 		{
-			printf("connect timed out\n");
+			printf(">> connect timed out\n");
 			clearData();
 			state = ConnectFail;
 			OnDisconnect();
@@ -109,7 +119,16 @@ void Connection::Update(float deltaTime)
 			printf("connection timed out\n");
 			clearData();
 			if (state == Connecting)
+			{
 				state = ConnectFail;
+			}
+			OnDisconnect();
+		}
+		// Disconnect server if no client connects
+		// Therefore the server has timed out
+		else if (state == Listening)
+		{
+			clearData();
 			OnDisconnect();
 		}
 	}
@@ -123,16 +142,20 @@ void Connection::Update(float deltaTime)
 //=======================
 bool Connection::SendPacket(const unsigned char data[], int size)
 {
-	assert(running);
 	if (address.GetAddress() == 0)
+	{
 		return false;
+	}
+
 	unsigned char * packet = new unsigned char[size + 4];
 	packet[0] = (unsigned char)(protocolId >> 24);
 	packet[1] = (unsigned char)((protocolId >> 16) & 0xFF);
 	packet[2] = (unsigned char)((protocolId >> 8) & 0xFF);
 	packet[3] = (unsigned char)((protocolId) & 0xFF);
 	memcpy(&packet[4], data, size);
+
 	bool res = socket.Send(address, packet, size + 4);
+
 	delete[] packet;
 	return res;
 }
@@ -140,16 +163,10 @@ bool Connection::SendPacket(const unsigned char data[], int size)
 
 int Connection::ReceivePacket(unsigned char data[], int size)
 {
-	assert(running);
 	Address sender;
 	unsigned char * packet = new unsigned char[size + 4];
 
 	int bytes_read = socket.Recv(sender, packet, size + 4);
-	if (bytes_read == 0)
-	{
-		delete[] packet;
-		return 0;
-	}
 	if (bytes_read <= 4)
 	{
 		delete[] packet;
@@ -163,9 +180,9 @@ int Connection::ReceivePacket(unsigned char data[], int size)
 		delete[] packet;
 		return 0;
 	}
-	if (mode == Server && !IsConnected())
+	if (mode == c_Server && !IsConnected())
 	{
-		printf("server accepts connection from client %d.%d.%d.%d:%d\n",
+		printf(">> server accepts connection from client %d.%d.%d.%d:%d\n",
 			sender.GetA(), sender.GetB(), sender.GetC(), sender.GetD(), sender.GetPort());
 		state = Connected;
 		address = sender;
@@ -173,14 +190,18 @@ int Connection::ReceivePacket(unsigned char data[], int size)
 	}
 	if (sender == address)
 	{
-		if (mode == Client && state == Connecting)
+		if (mode == c_Client && state == Connecting)
 		{
-			printf("client completes connection with server\n");
+			printf(">> client completes connection with server\n");
 			state = Connected;
 			OnConnect();
 		}
+
+		// If a packet was received - then we know the connection is active
+		// so reset the timeoutAccumulator to 0
 		timeoutAccumulator = 0.0f;
 		memcpy(data, &packet[4], bytes_read - 4);
+
 		delete[] packet;
 		return bytes_read - 4;
 	}
@@ -213,6 +234,11 @@ bool Connection::IsConnected(void) const
 bool Connection::IsListening(void) const
 {
 	return state == Listening;
+}
+
+bool Connection::IsDisconnected(void) const
+{
+	return state == Disconnected;
 }
 
 bool Connection::ConnectFailed(void) const
