@@ -148,6 +148,8 @@
     <ClCompile Include="..\common\ReliabilitySystem.cpp" />
     <ClCompile Include="..\common\ReliableConnection.cpp" />
     <ClCompile Include="..\common\Socket.cpp" />
+    <ClCompile Include="..\crc\CRC.cpp" />
+    <ClCompile Include="Server.cpp" />
     <ClCompile Include="serverMain.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -158,6 +160,8 @@
     <ClInclude Include="..\common\ReliabilitySystem.h" />
     <ClInclude Include="..\common\ReliableConnection.h" />
     <ClInclude Include="..\common\Socket.h" />
+    <ClInclude Include="..\crc\CRC.h" />
+    <ClInclude Include="Server.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
