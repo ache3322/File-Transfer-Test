@@ -13,54 +13,75 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\CRC Header">
+      <UniqueIdentifier>{9615d6e2-ccfa-4b1e-8abf-b5d67f349a7f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\CRC Source">
+      <UniqueIdentifier>{a6f42eb2-9351-4e56-aade-eb15f7d0d40d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Net Header">
+      <UniqueIdentifier>{bb85d3e6-2e9b-4120-b0be-a3952ad563fb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Net Source">
+      <UniqueIdentifier>{50319c52-d3b1-4f5f-b054-f3014e5b0eaf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="clientMain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\common\Address.cpp">
+    <ClCompile Include="Client.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\crc\CRC.cpp">
+      <Filter>Source Files\CRC Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\Address.cpp">
+      <Filter>Source Files\Net Source</Filter>
     </ClCompile>
     <ClCompile Include="..\common\Connection.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\common\PacketQueue.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Net Source</Filter>
     </ClCompile>
     <ClCompile Include="..\common\ReliabilitySystem.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\common\ReliableConnection.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Net Source</Filter>
     </ClCompile>
     <ClCompile Include="..\common\Socket.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Net Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\ReliableConnection.cpp">
+      <Filter>Source Files\Net Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\PacketQueue.cpp">
+      <Filter>Source Files\Net Source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Client.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\Connection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\PacketQueue.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\ReliabilitySystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\ReliableConnection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\common\Socket.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="..\crc\CRC.h">
+      <Filter>Header Files\CRC Header</Filter>
     </ClInclude>
     <ClInclude Include="..\common\Address.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Net Header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\Connection.h">
+      <Filter>Header Files\Net Header</Filter>
     </ClInclude>
     <ClInclude Include="..\common\FlowControl.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Net Header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\PacketQueue.h">
+      <Filter>Header Files\Net Header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\ReliabilitySystem.h">
+      <Filter>Header Files\Net Header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\ReliableConnection.h">
+      <Filter>Header Files\Net Header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\Socket.h">
+      <Filter>Header Files\Net Header</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
