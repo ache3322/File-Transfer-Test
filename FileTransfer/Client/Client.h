@@ -98,7 +98,7 @@ public:
 	/*-Statistics-*/
 	//------------------
 	void ShowStats(void);
-	void DisplayResults(int milli);
+	void DisplayResults(int milli, size_t vectorSize);
 
 	/*-Accessors-*/
 	//------------------

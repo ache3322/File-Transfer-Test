@@ -128,31 +128,20 @@ bool Client::Initialization(int targetPort)
 void Client::Run(vector<P>& package)
 {
 	bool connected = false;
-	bool sendDisconnect = false;
 	bool isTiming = false;
 	bool isDone = false;
 	float sendAccumulator = 0.0f;
 	float statsAccumulator = 0.0f;
-	int numOfDisACK = 0;
-	u_int64 packageIndex = 0;
-	u_int64 packageLastIndex = package.size() - 1;
 
 	FlowControl flowControl;
 
 	// ackBuffer will check for ACKs
 	unsigned char ackBuffer[kPacketSize] = { 0 };
-	// ACKs that are retrieved once file data has been officially retrieved
-	unsigned char ackCustom[kPacketSize] = { 0 };
-	// Used for checking if disconnect flag has been received
-	unsigned char ackDisconnect[kPacketSize] = { 0 };
-
-	memset(ackBuffer, 'a', kPacketSize);
-	memset(ackCustom, 'c', kPacketSize);
-	memset(ackDisconnect, 'd', kPacketSize);
+	memset(ackBuffer, 0, kPacketSize);
 
 
-	printf(">> Entering main-loop for sending & receiving\n");
-	while (!isDone)
+	printf(">> Client : Entering main-loop for sending & receiving\n");
+	while (true)
 	{
 		// Update flow control
 		if (connection.IsConnected()) {
@@ -187,57 +176,36 @@ void Client::Run(vector<P>& package)
 		//
 		while (sendAccumulator > 1.0f / sendRate)
 		{
-			if (connected == true)
+			if (connected == true && isDone == false)
 			{
-				if (sendDisconnect == false)
-				{
-					if (!isTiming)
-					{
-						// Start the timer
-						flowControl.StartTimer();
-						isTiming = true;
-					}
+				// Start the timer
+				flowControl.StartTimer();
 
-					// Prevent an overflow of the vector 
-					if (packageIndex > packageLastIndex)
-					{
-						sendDisconnect = true;
-					}
-					else
-					{
-						// Send the data to the Server
-						//  1. The 1st element of package is the file size
-						//  2. The 2nd element of package is the remaining bytes
-						//  3. The 3rd element of package is the CRC checksum
-						//  4. Other elements of package is the file contents
-						connection.SendPacket(package[packageIndex].pack, kPacketSize);
-					}
-				}
-				else
+
+				/* SENDING File Data to the Server */
+				for (int i = 0; i < package.size(); ++i)
 				{
-					connection.SendPacket(ackDisconnect, kPacketSize);
-					++numOfDisACK;
-					//if (numOfDisACK > 10)
-					//{
-					//	isDone = true;
-					//}
-					if (isTiming)
-					{
-						// Stop the timer
-						flowControl.EndTimer();
-						isTiming = false;
-					}
+					connection.SendPacket(package[i].pack, kPacketSize);
 				}
 
-				sendAccumulator -= 1.0f / sendRate;
+				isDone = true;
 			}
 			else
 			{
 				/* SENDING ACKs to the Server */
 				connection.SendPacket(ackBuffer, kPacketSize);
-				sendAccumulator -= 1.0f / sendRate;
 			}
+
+			sendAccumulator -= 1.0f / sendRate;
 		} /*end-while*/
+
+		if (isDone)
+		{
+			// Stop the timer
+			flowControl.EndTimer();
+			// Break-out of the infinite loop
+			break;
+		}
 
 		//
 		// RECEIVING DATA
@@ -250,46 +218,22 @@ void Client::Run(vector<P>& package)
 			{
 				break;
 			}
-			if (bytes_read > 0)
-			{
-				if (connected == true)
-				{
-					if (memcmp(packet, ackCustom, kPacketSize) == 0)
-					{
-						if (sendDisconnect == false)
-						{
-							// Increase what will be sent next...
-							++packageIndex;
-							//printf("index : %lld\n", packageIndex);
-						}
-					}
-				}
-			}
 		}
 
 		// Update connection - ensures Client is active
 		connection.Update(kDeltaTime);
 
 		// show connection stats
-		statsAccumulator += kDeltaTime;
-		while (statsAccumulator >= 0.20f && connection.IsConnected())
-		{
-			ShowStats();
-			statsAccumulator -= 0.20f;
-		}
-
 		FlowControl::wait_seconds(kDeltaTime);
 	}
 
+	printf("\n");
 	printf(">> Outside the send/receiving loop\n");
-	printf(" >> ackDisconnections sent: %d\n", numOfDisACK);
 	//----------------------------------------------
 
 	// Displaying final results
 	int milli = flowControl.GetDeltaTime();
-	printf(">> The std::vector size: %lld\n", package.size());
-	printf("[DE] : %s\n", package[package.size() - 1].pack);
-	DisplayResults(milli);
+	DisplayResults(milli, package.size());
 }
 
 
@@ -341,22 +285,30 @@ bool Client::ReadFile(string fileName, vector<P>& package)
 
 		int arrIndex = 0;
 		struct P data = { 0 };
-		memset(data.pack, 0, kPacketSize);
+		struct P size = { 0 };
+		memset(size.pack, 0, kPacketSize);
 		
 		// 1. Store the entire length (bufferLength) of the file
-		sprintf_s((char *)data.pack, kPacketSize, "%lld", bufferLength);
-		package.push_back(data);
+		sprintf_s((char *)size.pack, kPacketSize, "%lld", bufferLength);
+		package.push_back(size);
 
 		// 2. Get the remainder of any left-over file bytes
+		struct P leftover = { 0 };
+		memset(leftover.pack, 0, kPacketSize);
+
 		int remainder = bufferLength % (kPacketSize - 1);
-		sprintf_s((char *)data.pack, kPacketSize, "%d", remainder);
-		package.push_back(data);
+		sprintf_s((char *)leftover.pack, kPacketSize, "%d", remainder);
+		package.push_back(leftover);
+
 
 		// 3. Store the Client's CRC checksum
-		sprintf_s((char *)data.pack, kPacketSize, "%ld", checkSum);
-		package.push_back(data);
+		struct P crcSum = { 0 };
+		memset(crcSum.pack, 0, kPacketSize);
+		sprintf_s((char *)crcSum.pack, kPacketSize, "%ld", checkSum);
+		package.push_back(crcSum);
 
-		// 3. Package the "actual" file contents
+
+		// 4. Package the "actual" file contents
 		memset(data.pack, 0, kPacketSize);
 		for (int i = 0; i < bufferLength; ++i)
 		{
@@ -443,7 +395,7 @@ void Client::ShowStats(void)
 * \param milli - int - The elapsed milliseconds for how long it took to send the data
 * \return None
 */
-void Client::DisplayResults(int milli)
+void Client::DisplayResults(int milli, size_t vectorSize)
 {
 	float sec = (float)(milli / 1000.0f);
 
@@ -458,6 +410,11 @@ void Client::DisplayResults(int milli)
 
 	printf("\n");
 	printf("---------------------------------\n");
+	printf("CLIENT INFORMATION\n");
+	printf("---------------------------------\n");
+	printf("Client's std::vector package size = %lld\n", vectorSize);
+
+	printf("\n");
 	printf("File size: %lld bytes (%.3f kB)\n", GetFileSize(), (float)(GetFileSize() / 1000.0f));
 	printf("Total send time: %d ms (%.2f s)\n", milli, sec);
 	printf("Approx. speed: %.1f B/s (%.1f kB/s) (%.1f bps)\n", speed, speed / 1000.0f, speedBits);

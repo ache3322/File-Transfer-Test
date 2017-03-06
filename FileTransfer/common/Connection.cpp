@@ -116,7 +116,7 @@ void Connection::Update(float deltaTime)
 		}
 		else if (state == Connected)
 		{
-			printf("connection timed out\n");
+			printf(">> connection timed out\n");
 			clearData();
 			if (state == Connecting)
 			{

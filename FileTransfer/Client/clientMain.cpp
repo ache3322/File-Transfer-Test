@@ -12,6 +12,7 @@
 *		4th argument : The file to be sent to the server
 */
 #include <stdio.h>
+#include <stdlib.h>
 #include "Client.h"
 using namespace std;
 
@@ -26,7 +27,6 @@ int main(int argc, char* argv[])
 
 		if (clientPort != serverPort)
 		{
-
 			Client client(argv[1], clientPort);
 
 			// Pass in the Server port to connect to...
@@ -63,7 +63,6 @@ int main(int argc, char* argv[])
 		printf("  server_port - The port for connecting to the server\n");
 		printf("  file - The file being transferred\n");
 	}
-
 
 	printf("Closing the application\n");
 	return 0;
