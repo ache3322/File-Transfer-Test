@@ -141,6 +141,8 @@ void Server::Run(void)
 	char disACK[kPacketSize] = { 0 };
 	memset(disACK, 'd', kPacketSize);
 
+	int numOfDisACK = 0;
+
 	FlowControl flowControl;
 	vector<P> package;
 
@@ -213,14 +215,25 @@ void Server::Run(void)
 					{
 						if (memcmp(packet, disACK, kPacketSize) == 0)
 						{
-							printf(">> Found disconnection ACK!\n");
-							isDone = true;
+							++numOfDisACK;
+							if (numOfDisACK > 32)
+							{
+								printf(">> Recieved disconnection ACK\n");
+								isDone = true;
+							}
+							if (isTiming)
+							{
+								printf(">> Stopped the timer. Waiting for disconnection...\n");
+								// Stop the timer
+								flowControl.EndTimer();
+								isTiming = false;
+							}
 						}
 						else
 						{
 							if (!isTiming)
 							{
-								printf(">> Receiving data. It may take a while...\n");
+								printf(">> Starting the timer. Receiving data. It may take a while...\n");
 								// Start the timer when we 1st receive the data
 								flowControl.StartTimer();
 								isTiming = true;
@@ -254,9 +267,6 @@ void Server::Run(void)
 	// Ensure that the server has retrieved data
 	if (hasConnected)
 	{
-		// Stop the timer
-		flowControl.EndTimer();
-
 		//-----------------------------
 		// Rebuilding the entire file... through the package
 		char* reconstruct = NULL;
@@ -267,7 +277,8 @@ void Server::Run(void)
 
 		delete[] reconstruct;
 		//-----------------------------
-		printf(">> The std::vector size: %lld\n", package.size());
+		printf("\n");
+		printf(">> The std::vector actual size : %lld\n", package.size());
 		int milliseconds = flowControl.GetDeltaTime();
 		DisplayResults(milliseconds, expectedCRC);
 
@@ -304,7 +315,7 @@ char* Server::RebuildFile(vector<P>& package, unsigned long& crc)
 	int leftOver = atoi((char *)package[1].data);
 
 	// 3 The 3rd element is the CRC checksum
-	crc = atol((char*)package[2].data);
+	crc = atoll((char*)package[2].data);
 
 	// Allocate enough space
 	char* output = new char[(size_t)sizeOfFile + 1];

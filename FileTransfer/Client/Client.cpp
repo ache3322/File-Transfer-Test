@@ -121,6 +121,7 @@ bool Client::Initialization(int targetPort)
 void Client::Run(vector<P>& package)
 {
 	bool connected = false;
+	bool isTiming = false;
 	float sendAccumulator = 0.0f;
 	float statsAccumulator = 0.0f;
 
@@ -132,6 +133,10 @@ void Client::Run(vector<P>& package)
 	// ackBuffer will check for ACKs
 	char ackBuffer[kPacketSize] = { 0 };
 	memset(ackBuffer, 'a', kPacketSize);
+	// Used for checking if disconnect flag has been received
+	unsigned char disACK[kPacketSize] = { 0 };
+	memset(disACK, 'd', kPacketSize);
+	int numOfDisACK = 0;
 
 	u_int64 packageIndex = 0;
 
@@ -180,32 +185,43 @@ void Client::Run(vector<P>& package)
 			{
 				if (sendDisconnect == false)
 				{
-					// Start the timer
-					flowControl.StartTimer();
+					if (!isTiming)
+					{
+						// Start the timer
+						flowControl.StartTimer();
+						isTiming = true;
+					}
 
-					// Send the data to the Server
-					//  1. The 1st element of package is the file size
-					//  2. The 2nd element of package is the remaining bytes
-					//  3. The 3rd element of package is the CRC checksum
-					//  4. Other elements of package is the file contents
-					//for (size_t i = 0; i < package.size(); ++i)
-					//{
-						int length = sizeof(package[packageIndex].pack);
-						connection.SendPacket(package[packageIndex].pack, length);
-					//}
-
-					// End the timer
-					flowControl.EndTimer();
-					if (packageIndex == (package.size() - 1))
+					// Prevent an overflow of the vector 
+					if (packageIndex > (package.size() - 1))
 					{
 						sendDisconnect = true;
+					}
+					else
+					{
+						// Send the data to the Server
+						//  1. The 1st element of package is the file size
+						//  2. The 2nd element of package is the remaining bytes
+						//  3. The 3rd element of package is the CRC checksum
+						//  4. Other elements of package is the file contents
+						int length = sizeof(package[packageIndex].pack);
+						connection.SendPacket(package[packageIndex].pack, length);
 					}
 				}
 				else
 				{
-					unsigned char disACK[kPacketSize];
-					memset(disACK, 'd', kPacketSize);
 					connection.SendPacket(disACK, kPacketSize);
+					++numOfDisACK;
+					if (numOfDisACK > 32)
+					{
+						isDone = true;
+					}
+					if (isTiming)
+					{
+						// End the timer
+						flowControl.EndTimer();
+						isTiming = false;
+					}
 				}
 
 				sendAccumulator -= 1.0f / sendRate;
@@ -219,7 +235,7 @@ void Client::Run(vector<P>& package)
 
 				sendAccumulator -= 1.0f / sendRate;
 			}
-		}
+		} /*end-while*/
 
 		//
 		// RECEIVING DATA
@@ -251,16 +267,6 @@ void Client::Run(vector<P>& package)
 
 		// Update connection - ensures Client is active
 		connection.Update(kDeltaTime);
-
-		// show connection stats
-		statsAccumulator += kDeltaTime;
-
-		while (statsAccumulator >= 0.25f && connection.IsConnected())
-		{
-			//ShowStats();
-			statsAccumulator -= 0.25f;
-		}
-
 		FlowControl::wait_seconds(kDeltaTime);
 	}
 
@@ -444,7 +450,6 @@ void Client::DisplayResults(int milli, float rtt, float sentBandwidth)
 	printf("File size: %lld bytes (%.3f kB)\n", GetFileSize(), (float)(GetFileSize() / 1000.0f));
 	printf("Total send time: %d ms (%.2f s)\n", milli, sec);
 	printf("Approx. speed: %.1f B/s (%.1f kB/s) (%.1f bps)\n", speed, speed / 1000.0f, speedBits);
-	printf("rtt %.1fms, sent bandwidth = %.1fkbps\n", rtt * 1000.0f, sentBandwidth);
 
 	// Displaying the CRC results
 	printf("\n");
