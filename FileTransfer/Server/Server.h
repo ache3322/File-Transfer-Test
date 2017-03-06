@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <fstream>
 #include <iostream>
+#include <new>
 #include <string>
 #include <vector>
 #include "..\common\ReliableConnection.h"
@@ -30,7 +31,7 @@ typedef unsigned long long long64_t;
 // SERVER CONSTANTS
 //=============================
 #define kDefaultPort		13336
-#define kServerTimeOut		10.0f
+#define kServerTimeOut		5.0f
 
 
 //=============================
@@ -66,6 +67,7 @@ private:
 	int serverPort;						//!< The port of the server
 
 	long64_t fileSize;					//!< The size of the file (bytes)
+	long64_t actualSize;				//!< The acutal file size (bytes) that were counted
 
 
 	//=============================
@@ -96,7 +98,7 @@ public:
 	/*-Statistics-*/
 	//------------------
 	void ShowStats(void);
-	void DisplayResults(int milli, unsigned long expectedCRC);
+	void DisplayResults(vector<P>& theData, int milli, unsigned long expectedCRC);
 
 	/*-Accessors-*/
 	//------------------

@@ -22,9 +22,19 @@ using namespace std;
 #define __SOCKET_H__
 
 
+//=============================
+// CONSTANTS
+//=============================
+#define kMinimumPort		1024
+
+
+//=============================
+// CLASS
+//=============================
 /*!
 * \class Socket
-* \brief
+* \brief The Socket class encapsulates the functionalities of a Windows Socket.
+* \details
 */
 class Socket
 {

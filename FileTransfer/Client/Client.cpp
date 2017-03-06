@@ -21,7 +21,7 @@ Client::Client()
 	: connection(kProtocolId, kTimeOut)
 {
 	targetIP = "127.0.0.1";
-	clientPort = 13337;
+	clientPort = kDefaultClientPort;
 	fileName = "";
 	fileSize = 0;
 }
@@ -38,7 +38,14 @@ Client::Client(string ipAddress, int port)
 	: connection(kProtocolId, kTimeOut)
 {
 	targetIP = ipAddress;
-	clientPort = port;
+	if (port < kMinimumPort)
+	{
+		clientPort = kDefaultClientPort;
+	}
+	else
+	{
+		clientPort = port;
+	}
 	fileName = "";
 	fileSize = 0;
 }
@@ -121,32 +128,34 @@ bool Client::Initialization(int targetPort)
 void Client::Run(vector<P>& package)
 {
 	bool connected = false;
+	bool sendDisconnect = false;
 	bool isTiming = false;
+	bool isDone = false;
 	float sendAccumulator = 0.0f;
 	float statsAccumulator = 0.0f;
-
-	float rtt = 0.0f;
-	float sent_bandwidth = 0.0f;
+	int numOfDisACK = 0;
+	u_int64 packageIndex = 0;
+	u_int64 packageLastIndex = package.size() - 1;
 
 	FlowControl flowControl;
 
 	// ackBuffer will check for ACKs
-	char ackBuffer[kPacketSize] = { 0 };
-	memset(ackBuffer, 'a', kPacketSize);
+	unsigned char ackBuffer[kPacketSize] = { 0 };
+	// ACKs that are retrieved once file data has been officially retrieved
+	unsigned char ackCustom[kPacketSize] = { 0 };
 	// Used for checking if disconnect flag has been received
-	unsigned char disACK[kPacketSize] = { 0 };
-	memset(disACK, 'd', kPacketSize);
-	int numOfDisACK = 0;
+	unsigned char ackDisconnect[kPacketSize] = { 0 };
 
-	u_int64 packageIndex = 0;
+	memset(ackBuffer, 'a', kPacketSize);
+	memset(ackCustom, 'c', kPacketSize);
+	memset(ackDisconnect, 'd', kPacketSize);
 
-	bool sendDisconnect = false;
-	bool isDone = false;
+
+	printf(">> Entering main-loop for sending & receiving\n");
 	while (!isDone)
 	{
-		// update flow control
-		if (connection.IsConnected())
-		{
+		// Update flow control
+		if (connection.IsConnected()) {
 			flowControl.Update(kDeltaTime, connection.GetReliabilitySystem().GetRoundTripTime() * 1000.0f);
 		}
 
@@ -155,20 +164,17 @@ void Client::Run(vector<P>& package)
 		//
 		// Detect changes in connection state
 		//
-		if (!connected && connection.IsConnected())
-		{
+		if (!connected && connection.IsConnected()) {
 			printf(" >> Client connected to server\n");
 			connected = true;
 		}
 		// Client disconnection
-		if (connection.IsDisconnected())
-		{
+		if (connection.IsDisconnected()) {
 			printf(" >> Client has disconnected\n");
 			break;
 		}
 		// Client connection failed
-		if (!connected && connection.ConnectFailed())
-		{
+		if (!connected && connection.ConnectFailed()) {
 			printf(" >> Connection failed\n");
 			break;
 		}
@@ -193,7 +199,7 @@ void Client::Run(vector<P>& package)
 					}
 
 					// Prevent an overflow of the vector 
-					if (packageIndex > (package.size() - 1))
+					if (packageIndex > packageLastIndex)
 					{
 						sendDisconnect = true;
 					}
@@ -204,21 +210,20 @@ void Client::Run(vector<P>& package)
 						//  2. The 2nd element of package is the remaining bytes
 						//  3. The 3rd element of package is the CRC checksum
 						//  4. Other elements of package is the file contents
-						int length = sizeof(package[packageIndex].pack);
-						connection.SendPacket(package[packageIndex].pack, length);
+						connection.SendPacket(package[packageIndex].pack, kPacketSize);
 					}
 				}
 				else
 				{
-					connection.SendPacket(disACK, kPacketSize);
+					connection.SendPacket(ackDisconnect, kPacketSize);
 					++numOfDisACK;
-					if (numOfDisACK > 32)
-					{
-						isDone = true;
-					}
+					//if (numOfDisACK > 10)
+					//{
+					//	isDone = true;
+					//}
 					if (isTiming)
 					{
-						// End the timer
+						// Stop the timer
 						flowControl.EndTimer();
 						isTiming = false;
 					}
@@ -229,10 +234,7 @@ void Client::Run(vector<P>& package)
 			else
 			{
 				/* SENDING ACKs to the Server */
-				unsigned char packet[kPacketSize];
-				memset(packet, 'a', kPacketSize);
-				connection.SendPacket(packet, kPacketSize);
-
+				connection.SendPacket(ackBuffer, kPacketSize);
 				sendAccumulator -= 1.0f / sendRate;
 			}
 		} /*end-while*/
@@ -252,13 +254,13 @@ void Client::Run(vector<P>& package)
 			{
 				if (connected == true)
 				{
-					if (memcmp(packet, ackBuffer, kPacketSize) == 0)
+					if (memcmp(packet, ackCustom, kPacketSize) == 0)
 					{
 						if (sendDisconnect == false)
 						{
 							// Increase what will be sent next...
 							++packageIndex;
-							printf("index : %lld\n", packageIndex);
+							//printf("index : %lld\n", packageIndex);
 						}
 					}
 				}
@@ -267,16 +269,27 @@ void Client::Run(vector<P>& package)
 
 		// Update connection - ensures Client is active
 		connection.Update(kDeltaTime);
+
+		// show connection stats
+		statsAccumulator += kDeltaTime;
+		while (statsAccumulator >= 0.20f && connection.IsConnected())
+		{
+			ShowStats();
+			statsAccumulator -= 0.20f;
+		}
+
 		FlowControl::wait_seconds(kDeltaTime);
 	}
 
 	printf(">> Outside the send/receiving loop\n");
+	printf(" >> ackDisconnections sent: %d\n", numOfDisACK);
 	//----------------------------------------------
 
 	// Displaying final results
 	int milli = flowControl.GetDeltaTime();
 	printf(">> The std::vector size: %lld\n", package.size());
-	DisplayResults(milli, rtt, sent_bandwidth);
+	printf("[DE] : %s\n", package[package.size() - 1].pack);
+	DisplayResults(milli);
 }
 
 
@@ -428,11 +441,9 @@ void Client::ShowStats(void)
 /**
 * \brief Show the data results.
 * \param milli - int - The elapsed milliseconds for how long it took to send the data
-* \param rtt - float - The Round Transmission Time that it takes for the data to be sent and ACKed
-* \param sentBandwidth - float - The bandwidth speed for sending data
 * \return None
 */
-void Client::DisplayResults(int milli, float rtt, float sentBandwidth)
+void Client::DisplayResults(int milli)
 {
 	float sec = (float)(milli / 1000.0f);
 

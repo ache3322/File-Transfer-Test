@@ -20,6 +20,12 @@ using namespace std;
 #define __CLIENT_H__
 
 //=============================
+// CONSTANTS
+//=============================
+#define kDefaultClientPort		13337
+
+
+//=============================
 // TYPEDEF DEFINITIONS
 //=============================
 typedef unsigned long long long64_t;
@@ -92,7 +98,7 @@ public:
 	/*-Statistics-*/
 	//------------------
 	void ShowStats(void);
-	void DisplayResults(int milli, float rtt, float sentBandwidth);
+	void DisplayResults(int milli);
 
 	/*-Accessors-*/
 	//------------------

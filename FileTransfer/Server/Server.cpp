@@ -38,7 +38,7 @@ Server::Server(int port)
 {
 	serverIP = "NA";
 
-	if (port > 1024)
+	if (port > kMinimumPort)
 	{
 		serverPort = port;
 	}
@@ -128,25 +128,30 @@ bool Server::Initialization(void)
 */
 void Server::Run(void)
 {
+	vector<P> package;
 	bool connected = false;
 	bool hasConnected = false;
+	bool isDone = false;
 	bool isTiming = false;
 	float sendAccumulator = 0.0f;
 	float statsAccumulator = 0.0f;
-
-	// ackBuffer will check for ACKs
-	char ackBuffer[kPacketSize] = { 0 };
-	memset(ackBuffer, 'a', kPacketSize);
-	// Used for checking if disconnect flag has been received
-	char disACK[kPacketSize] = { 0 };
-	memset(disACK, 'd', kPacketSize);
-
 	int numOfDisACK = 0;
 
 	FlowControl flowControl;
-	vector<P> package;
 
-	bool isDone = false;
+	// ackBuffer will check for ACKs
+	unsigned char ackBuffer[kPacketSize] = { 0 };
+	// ACKs that are sent once file data has been officially retrieved
+	unsigned char ackCustom[kPacketSize] = { 0 };
+	// Used for checking if disconnect flag has been received
+	unsigned char ackDisconnect[kPacketSize] = { 0 };
+
+	memset(ackBuffer, 'a', kPacketSize);
+	memset(ackCustom, 'c', kPacketSize);
+	memset(ackDisconnect, 'd', kPacketSize);
+
+
+	printf(">> Entering main-loop for sending & receiving\n");
 	while (!isDone)
 	{
 		// update flow control
@@ -187,10 +192,16 @@ void Server::Run(void)
 		// 
 		while (sendAccumulator > 1.0f / sendRate)
 		{
-			// Server sending back ACKs to the client
-			unsigned char packet[kPacketSize];
-			memset(packet, 'a', kPacketSize);
-			connection.SendPacket(packet, kPacketSize);
+			if (connected)
+			{
+				// If a client connected - send custom packets
+				// designed for client to acknowledge that server has received data
+				connection.SendPacket(ackCustom, kPacketSize);
+			}
+			else
+			{
+				connection.SendPacket(ackBuffer, kPacketSize);
+			}
 			sendAccumulator -= 1.0f / sendRate;
 		}
 
@@ -201,24 +212,43 @@ void Server::Run(void)
 		{
 			unsigned char packet[kPacketSize];
 			int bytes_read = connection.ReceivePacket(packet, kPacketSize);
-			if (bytes_read == 0)
-			{
+			if (bytes_read == 0) {
 				break;
 			}
 			if (bytes_read > 0)
 			{
 				if (connected == true)
 				{
-					// Check if entire packet buffer is all ACKs
+					// Check if entire packet buffer is all ACKs ('a')
 					// else, we know it is the actual data
 					if (memcmp(packet, ackBuffer, kPacketSize) != 0)
 					{
-						if (memcmp(packet, disACK, kPacketSize) == 0)
+						// Verify if disconnect ACKs (messages) were sent
+						if (memcmp(packet, ackDisconnect, kPacketSize) != 0)
+						{
+							if (!isTiming)
+							{
+								printf(">> Starting the timer. Receiving data. It may take a while...\n");
+								// Start the timer when we 1st receive the data
+								flowControl.StartTimer();
+								isTiming = true;
+							}
+							if (bytes_read < kPacketSize)
+							{
+								printf("Found bytes_read is less: %d\n", bytes_read);
+							}
+
+							struct P tmp = { 0 };
+							memcpy(tmp.data, packet, bytes_read);
+							package.push_back(tmp);
+							hasConnected = true;
+						}
+						else
 						{
 							++numOfDisACK;
-							if (numOfDisACK > 32)
+							if (numOfDisACK > 10)
 							{
-								printf(">> Recieved disconnection ACK\n");
+								printf(">> Received disconnection ACK\n");
 								isDone = true;
 							}
 							if (isTiming)
@@ -229,37 +259,21 @@ void Server::Run(void)
 								isTiming = false;
 							}
 						}
-						else
-						{
-							if (!isTiming)
-							{
-								printf(">> Starting the timer. Receiving data. It may take a while...\n");
-								// Start the timer when we 1st receive the data
-								flowControl.StartTimer();
-								isTiming = true;
-							}
-
-							struct P tmp = { 0 };
-							memcpy(tmp.data, packet, bytes_read);
-							package.push_back(tmp);
-							hasConnected = true;
-						}
 					}
 				}
-			}
-		}
+			} /*end-if*/
+		} /*end-while*/
 
 		// update connection
 		connection.Update(kDeltaTime);
 
 		// show connection stats
-		statsAccumulator += kDeltaTime;
-
-		while (statsAccumulator >= 0.25f && connection.IsConnected())
-		{
-			//ShowStats();
-			statsAccumulator -= 0.25f;
-		}
+		//statsAccumulator += kDeltaTime;
+		//while (statsAccumulator >= 0.20f && connection.IsConnected())
+		//{
+		//	ShowStats();
+		//	statsAccumulator -= 0.20f;
+		//}
 
 		FlowControl::wait_seconds(kDeltaTime);
 	}
@@ -272,16 +286,27 @@ void Server::Run(void)
 		char* reconstruct = NULL;
 		unsigned long expectedCRC = 0L;
 
-		reconstruct = RebuildFile(package, expectedCRC);
-		CRCTest(reconstruct, fileSize);
+		try
+		{
+			reconstruct = RebuildFile(package, expectedCRC);
+			CRCTest(reconstruct, fileSize);
 
-		delete[] reconstruct;
-		//-----------------------------
-		printf("\n");
-		printf(">> The std::vector actual size : %lld\n", package.size());
-		int milliseconds = flowControl.GetDeltaTime();
-		DisplayResults(milliseconds, expectedCRC);
+			delete[] reconstruct;
 
+			//-----------------------------
+			printf("\n");
+			int milliseconds = flowControl.GetDeltaTime();
+			DisplayResults(package, milliseconds, expectedCRC);
+		}
+		catch (bad_alloc& ba)
+		{
+			printf(" >> Error. Bad memory allocation\n");
+		}
+		catch (exception& e)
+		{
+			printf(" >> Error. Caught unknown exception\n");
+			printf("  >> %s\n", e.what());
+		}
 		//-----------------------------
 	}
 	else
@@ -304,8 +329,9 @@ void Server::Run(void)
 char* Server::RebuildFile(vector<P>& package, unsigned long& crc)
 {
 	// Rebuilding the entire file... using the package
-	int indexCount = 0;
-	int packageSize = package.size();
+	size_t indexCount = 0;
+	size_t lastIndex = package.size() - 1;
+	size_t minimumIndex = package.size() - 1;
 
 	// 1. The 1st element is file size
 	long64_t sizeOfFile = atoll((char *)package[0].data);
@@ -315,19 +341,20 @@ char* Server::RebuildFile(vector<P>& package, unsigned long& crc)
 	int leftOver = atoi((char *)package[1].data);
 
 	// 3 The 3rd element is the CRC checksum
-	crc = atoll((char*)package[2].data);
+	crc = atol((char*)package[2].data);
 
 	// Allocate enough space
-	char* output = new char[(size_t)sizeOfFile + 1];
-	memset(output, 0, (size_t)sizeOfFile + 1);
+	char* output = new char[sizeOfFile + 1];
+	//memset(output, 0, (size_t)sizeOfFile + 1);
 
 	// Ensure the package elements size is greater than 4
-	// to proceed to the for-loop
-	if (packageSize > 4)
+	// to proceed to the for-loop, since anything beyond
+	// the 3rd index is considered file data...
+	if (minimumIndex > 3)
 	{
 		// The rest of the index is the file contents
 		// NOTE: The size of these packets will always be kPacketSize
-		for (int i = 3; i < packageSize - 1; ++i)
+		for (int i = 3; i < lastIndex; ++i)
 		{
 			for (int j = 0; j < (kPacketSize - 1); ++j)
 			{
@@ -337,13 +364,17 @@ char* Server::RebuildFile(vector<P>& package, unsigned long& crc)
 		}
 	}
 
-	int lastIndex = package.size() - 1;
-	// The remaining file contents
+	// The remaining file contents - therefore there are remaining
+	// bytes that are less than the kPacketSize (eg. 256, 1024, etc.)
 	for (int j = 0; j < leftOver; ++j)
 	{
 		output[indexCount] = package[lastIndex].data[j];
 		++indexCount;
 	}
+
+	actualSize = indexCount;
+	// testing - print out last index
+	printf("[DE] : %s\n", package[lastIndex].data);
 
 	return output;
 }
@@ -410,7 +441,7 @@ void Server::ShowStats(void)
 * \param expectedCRC - unsigned long - The expected CRC checksum to compare against the actual checksum
 * \return None
 */
-void Server::DisplayResults(int milli, unsigned long expectedCRC)
+void Server::DisplayResults(vector<P>& theData, int milli, unsigned long expectedCRC)
 {
 	unsigned long actualCRC = crc.GetCheckSum();
 
@@ -422,8 +453,15 @@ void Server::DisplayResults(int milli, unsigned long expectedCRC)
 
 	printf("\n");
 	printf("---------------------------------\n");
+	printf("Actual custom std::vector size = %lld\n", theData.size());
+	printf(" 1st element (filesize)  : %lld\n", atoll((char *)theData[0].data));
+	printf(" 2nd element (remainder) : %d\n", atoi((char *)theData[1].data));
+
 	// Displaying the transmission speed
+	printf("\n");
 	printf("File size: %lld bytes (%.3f kB)\n", GetFileSize(), (float)(GetFileSize() / 1000.0f));
+	printf("Retrieved size: %lld bytes (%.3f kB)\n", actualSize, (float)(actualSize / 1000.0f));
+	printf("Missing file bytes: %lld bytes (%.3f kB)\n", GetFileSize() - actualSize, (float)(GetFileSize() / 1000.0f) - (float)(actualSize / 1000.0f));
 	printf("Total receive time: %d ms (%.1f s)\n", milli, sec);
 	printf("Approx. transfer speed: %.1f B/s (%.1f kB/s) (%.1f bps) (%.3f kbps)\n", 
 		speedBytes, speedBytes / 1000.0f, speedBits, speedBits / 1000.0f);
