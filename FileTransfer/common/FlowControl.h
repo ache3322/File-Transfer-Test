@@ -9,6 +9,7 @@
 *		The source code is modified and used for experimental/educational purposes.
 */
 #include <stdio.h>
+#include <time.h>
 
 #ifndef __FLOWCONTROL_H__
 #define __FLOWCONTROL_H__
@@ -41,6 +42,8 @@ private:
 	float good_conditions_time;
 	float penalty_reduction_accumulator;
 
+	clock_t start;
+	clock_t difference;
 
 public:
 
@@ -120,7 +123,30 @@ public:
 	{
 		Sleep((int)(seconds * 1000.0f));
 	}
-};
 
+
+	void StartTimer(void)
+	{
+		start = clock();
+	}
+
+	void EndTimer(void)
+	{
+		difference = clock() - start;
+	}
+
+	int GetDeltaTime(void)
+	{
+		// Convert time to milliseconds
+		int millisecond = (int)(difference * 1000 / CLOCKS_PER_SEC);
+		return millisecond;
+	}
+
+	void ResetTimer(void)
+	{
+		start = 0;
+		difference = 0;
+	}
+};
 
 #endif // ! __FLOWCONTROL_H__

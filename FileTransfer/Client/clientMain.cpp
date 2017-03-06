@@ -6,7 +6,7 @@
 * DESCRIPTION	: This is the main-entry point for the Client application.
 *		The client application takes in 5 command-line arguments.
 *
-*		1st argument : The client's IPv4
+*		1st argument : The server's IPv4
 *		2nd argument : The client's port
 *		3rd argument : The server port (who the client will connect to)
 *		4th argument : The file to be sent to the server
@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
 	else
 	{
 		printf("Usage : Client.exe ip client_port server_port file\n");
-		printf("  ip - The IPv4 address of the client\n");
+		printf("  ip - The IPv4 address of the server\n");
 		printf("  client_port - The port for the client\n");
 		printf("  server_port - The port for connecting to the server\n");
 		printf("  file - The file being transferred\n");

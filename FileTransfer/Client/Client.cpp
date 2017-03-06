@@ -20,8 +20,10 @@
 Client::Client()
 	: connection(kProtocolId, kTimeOut)
 {
-	clientIP = "127.0.0.1";
+	targetIP = "127.0.0.1";
 	clientPort = 13337;
+	fileName = "";
+	fileSize = 0;
 }
 
 
@@ -35,8 +37,10 @@ Client::Client()
 Client::Client(string ipAddress, int port)
 	: connection(kProtocolId, kTimeOut)
 {
-	clientIP = ipAddress;
+	targetIP = ipAddress;
 	clientPort = port;
+	fileName = "";
+	fileSize = 0;
 }
 
 
@@ -72,14 +76,14 @@ bool Client::Initialization(int targetPort)
 	}
 
 	// Ensure the IP address is valid...
-	if (!Address::ValidateIP(clientIP))
+	if (!Address::ValidateIP(targetIP))
 	{
 		printf(" >> Invalid IP address\n");
 		return false;
 	}
 
 	// Specify who the client will connect to (using the target port)
-	address = Address(clientIP.c_str(), targetPort);
+	address = Address(targetIP.c_str(), targetPort);
 
 	// Attempt to start a connection on the client port
 	if (!connection.Start(clientPort))
@@ -92,7 +96,7 @@ bool Client::Initialization(int targetPort)
 	// the Address that was recovered
 	connection.Connect(address);
 
-	printf(" Client IP : %s\n", clientIP.c_str());
+	printf(" Server IP : %s\n", targetIP.c_str());
 	printf(" Client port : %d\n", clientPort);
 	printf(" Server port : %d\n", targetPort);
 	printf("\n");
@@ -125,6 +129,13 @@ void Client::Run(vector<P>& package)
 
 	FlowControl flowControl;
 
+	// ackBuffer will check for ACKs
+	char ackBuffer[kPacketSize] = { 0 };
+	memset(ackBuffer, 'a', kPacketSize);
+
+	u_int64 packageIndex = 0;
+
+	bool sendDisconnect = false;
 	bool isDone = false;
 	while (!isDone)
 	{
@@ -167,29 +178,44 @@ void Client::Run(vector<P>& package)
 		{
 			if (connected == true)
 			{
-				// Send the data to the Server
-				//  1. The 1st element of package is the file size
-				//  2. The 2nd element of package is the remaining bytes
-				//  3. The 3rd element of package is the CRC checksum
-				//  4. Other elemens of package is the file contents
-				for (size_t i = 0; i < package.size(); ++i)
+				if (sendDisconnect == false)
 				{
-					int length = sizeof(package[i].pack);
-					connection.SendPacket(package[i].pack, length);
+					// Start the timer
+					flowControl.StartTimer();
 
-					rtt += connection.GetReliabilitySystem().GetRoundTripTime();
-					sent_bandwidth += connection.GetReliabilitySystem().GetSentBandwidth();
+					// Send the data to the Server
+					//  1. The 1st element of package is the file size
+					//  2. The 2nd element of package is the remaining bytes
+					//  3. The 3rd element of package is the CRC checksum
+					//  4. Other elements of package is the file contents
+					//for (size_t i = 0; i < package.size(); ++i)
+					//{
+						int length = sizeof(package[packageIndex].pack);
+						connection.SendPacket(package[packageIndex].pack, length);
+					//}
+
+					// End the timer
+					flowControl.EndTimer();
+					if (packageIndex == (package.size() - 1))
+					{
+						sendDisconnect = true;
+					}
+				}
+				else
+				{
+					unsigned char disACK[kPacketSize];
+					memset(disACK, 'd', kPacketSize);
+					connection.SendPacket(disACK, kPacketSize);
 				}
 
 				sendAccumulator -= 1.0f / sendRate;
-				isDone = true;
 			}
 			else
 			{
 				/* SENDING ACKs to the Server */
 				unsigned char packet[kPacketSize];
-				memset(packet, 'f', sizeof(packet));
-				connection.SendPacket(packet, sizeof(packet));
+				memset(packet, 'a', kPacketSize);
+				connection.SendPacket(packet, kPacketSize);
 
 				sendAccumulator -= 1.0f / sendRate;
 			}
@@ -205,6 +231,21 @@ void Client::Run(vector<P>& package)
 			if (bytes_read == 0)
 			{
 				break;
+			}
+			if (bytes_read > 0)
+			{
+				if (connected == true)
+				{
+					if (memcmp(packet, ackBuffer, kPacketSize) == 0)
+					{
+						if (sendDisconnect == false)
+						{
+							// Increase what will be sent next...
+							++packageIndex;
+							printf("index : %lld\n", packageIndex);
+						}
+					}
+				}
 			}
 		}
 
@@ -223,8 +264,13 @@ void Client::Run(vector<P>& package)
 		FlowControl::wait_seconds(kDeltaTime);
 	}
 
+	printf(">> Outside the send/receiving loop\n");
+	//----------------------------------------------
 
-	printf("rtt %.1fms, sent bandwidth = %.1fkbps\n", rtt * 1000.0f, sent_bandwidth);
+	// Displaying final results
+	int milli = flowControl.GetDeltaTime();
+	printf(">> The std::vector size: %lld\n", package.size());
+	DisplayResults(milli, rtt, sent_bandwidth);
 }
 
 
@@ -246,11 +292,11 @@ bool Client::ReadFile(string fileName, vector<P>& package)
 	if (is) 
 	{
 		char* buffer = NULL;
-		int bufferLength = 0;
+		long64_t bufferLength = 0;
 
 		// get length of file:
 		is.seekg(0, is.end);
-		bufferLength = (int)is.tellg();
+		bufferLength = (long64_t)is.tellg();
 		is.seekg(0, is.beg);
 
 		buffer = new char[bufferLength + 1];
@@ -261,9 +307,13 @@ bool Client::ReadFile(string fileName, vector<P>& package)
 		is.close();
 
 		//--------------------------
-		// Perform CRC test
-		printf(">> File size: %d\n", bufferLength);
 
+		SetFileName(fileName);
+		SetFileSize(bufferLength);
+
+		//--------------------------
+		// Perform CRC test
+		printf(">> File size: %lld bytes\n", bufferLength);
 		printf(">> Performing CRC test on %s\n", fileName.c_str());
 		unsigned long checkSum = CRCTest(buffer, bufferLength);
 
@@ -275,7 +325,7 @@ bool Client::ReadFile(string fileName, vector<P>& package)
 		memset(data.pack, 0, kPacketSize);
 		
 		// 1. Store the entire length (bufferLength) of the file
-		sprintf_s((char *)data.pack, kPacketSize, "%ld", bufferLength);
+		sprintf_s((char *)data.pack, kPacketSize, "%lld", bufferLength);
 		package.push_back(data);
 
 		// 2. Get the remainder of any left-over file bytes
@@ -324,16 +374,13 @@ bool Client::ReadFile(string fileName, vector<P>& package)
 */
 unsigned long Client::CRCTest(char* buffer, const long long bufferSize)
 {
-	CRC crc;
 	unsigned long checkSum = 0L;
 
 	// Applying the CRC - checksum!
 	crc.BuildCRCTable();
 	checkSum = crc.CalculateBufferCRC(bufferSize, checkSum, buffer);
 	checkSum = ~checkSum;	// Bit-invert
-
-	printf(" >> CRC32 is %08lX\n", checkSum);
-	printf("\n");
+	crc.SetCheckSum(checkSum);
 
 	return checkSum;
 }
@@ -369,4 +416,92 @@ void Client::ShowStats(void)
 		rtt * 1000.0f, sent_packets, acked_packets, lost_packets,
 		sent_packets > 0.0f ? (float)lost_packets / (float)sent_packets * 100.0f : 0.0f,
 		sent_bandwidth, acked_bandwidth);
+}
+
+
+/**
+* \brief Show the data results.
+* \param milli - int - The elapsed milliseconds for how long it took to send the data
+* \param rtt - float - The Round Transmission Time that it takes for the data to be sent and ACKed
+* \param sentBandwidth - float - The bandwidth speed for sending data
+* \return None
+*/
+void Client::DisplayResults(int milli, float rtt, float sentBandwidth)
+{
+	float sec = (float)(milli / 1000.0f);
+
+	// Calculate the speed (Bytes per second)
+	//  1. Speed = bytes sent / milliseconds?
+	//  2. Convert the milli to seconds? by dividing by 60s
+	float speed = GetFileSize() / sec;
+
+	// Calculate the speed (bits per second)
+	//  1. Convert bytes to bits by multiplying by 8 bits
+	float speedBits = (GetFileSize() * 8) / sec;
+
+	printf("\n");
+	printf("---------------------------------\n");
+	printf("File size: %lld bytes (%.3f kB)\n", GetFileSize(), (float)(GetFileSize() / 1000.0f));
+	printf("Total send time: %d ms (%.2f s)\n", milli, sec);
+	printf("Approx. speed: %.1f B/s (%.1f kB/s) (%.1f bps)\n", speed, speed / 1000.0f, speedBits);
+	printf("rtt %.1fms, sent bandwidth = %.1fkbps\n", rtt * 1000.0f, sentBandwidth);
+
+	// Displaying the CRC results
+	printf("\n");
+	printf(">> CRC32 test on file %s\n", GetFileName().c_str());
+	printf(" >> CRC32 is %08lX\n", crc.GetCheckSum());
+	printf("---------------------------------\n");
+	printf("\n");
+}
+
+
+
+//---------------------------------
+//=======================
+// ACCESSORS
+//=======================
+/**
+* \brief Get the file name.
+* \param None
+* \return string : The file name.
+*/
+string Client::GetFileName(void) const
+{
+	return fileName;
+}
+
+/**
+* \brief Get the file size.
+* \param None
+* \return long4_t : The file size.
+*/
+long64_t Client::GetFileSize(void) const
+{
+	return fileSize;
+}
+
+
+
+//---------------------------------
+//=======================
+// MUTATORS
+//=======================
+/**
+* \brief Set the file name.
+* \param None
+* \return None
+*/
+void Client::SetFileName(string& name)
+{
+	this->fileName = name;
+}
+
+/**
+* \brief Set the file size.
+* \param None
+* \return None
+*/
+void Client::SetFileSize(long64_t size)
+{
+	this->fileSize = size;
 }

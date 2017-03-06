@@ -130,13 +130,22 @@ void Server::Run(void)
 {
 	bool connected = false;
 	bool hasConnected = false;
+	bool isTiming = false;
 	float sendAccumulator = 0.0f;
 	float statsAccumulator = 0.0f;
+
+	// ackBuffer will check for ACKs
+	char ackBuffer[kPacketSize] = { 0 };
+	memset(ackBuffer, 'a', kPacketSize);
+	// Used for checking if disconnect flag has been received
+	char disACK[kPacketSize] = { 0 };
+	memset(disACK, 'd', kPacketSize);
 
 	FlowControl flowControl;
 	vector<P> package;
 
-	while (true)
+	bool isDone = false;
+	while (!isDone)
 	{
 		// update flow control
 
@@ -178,8 +187,8 @@ void Server::Run(void)
 		{
 			// Server sending back ACKs to the client
 			unsigned char packet[kPacketSize];
-			memset(packet, 'f', sizeof(packet));
-			connection.SendPacket(packet, sizeof(packet));
+			memset(packet, 'a', kPacketSize);
+			connection.SendPacket(packet, kPacketSize);
 			sendAccumulator -= 1.0f / sendRate;
 		}
 
@@ -198,19 +207,30 @@ void Server::Run(void)
 			{
 				if (connected == true)
 				{
-					char checker[kPacketSize] = { 0 };
-					memset(checker, 'f', sizeof(checker));
-
 					// Check if entire packet buffer is all ACKs
-					// else, we know it is the data
-					if (memcmp(packet, checker, kPacketSize) != 0)
+					// else, we know it is the actual data
+					if (memcmp(packet, ackBuffer, kPacketSize) != 0)
 					{
-						struct P tmp = { 0 };
-						memcpy(tmp.data, packet, bytes_read);
-						printf("Bytes read: %s | Bytes decimal: %d\n", packet, bytes_read);
+						if (memcmp(packet, disACK, kPacketSize) == 0)
+						{
+							printf(">> Found disconnection ACK!\n");
+							isDone = true;
+						}
+						else
+						{
+							if (!isTiming)
+							{
+								printf(">> Receiving data. It may take a while...\n");
+								// Start the timer when we 1st receive the data
+								flowControl.StartTimer();
+								isTiming = true;
+							}
 
-						package.push_back(tmp);
-						hasConnected = true;
+							struct P tmp = { 0 };
+							memcpy(tmp.data, packet, bytes_read);
+							package.push_back(tmp);
+							hasConnected = true;
+						}
 					}
 				}
 			}
@@ -234,16 +254,23 @@ void Server::Run(void)
 	// Ensure that the server has retrieved data
 	if (hasConnected)
 	{
+		// Stop the timer
+		flowControl.EndTimer();
+
 		//-----------------------------
 		// Rebuilding the entire file... through the package
 		char* reconstruct = NULL;
-		long long fileSize = 0;
-		unsigned long crcCheckSum = 0L;
+		unsigned long expectedCRC = 0L;
 
-		reconstruct = RebuildFile(package, fileSize, crcCheckSum);
-		CRCTest(reconstruct, fileSize, crcCheckSum);
+		reconstruct = RebuildFile(package, expectedCRC);
+		CRCTest(reconstruct, fileSize);
 
 		delete[] reconstruct;
+		//-----------------------------
+		printf(">> The std::vector size: %lld\n", package.size());
+		int milliseconds = flowControl.GetDeltaTime();
+		DisplayResults(milliseconds, expectedCRC);
+
 		//-----------------------------
 	}
 	else
@@ -260,19 +287,18 @@ void Server::Run(void)
 *	information about the file size, remaining bytes, and CRC checksum. A buffer is allocated enough
 *	memory to hold the reconstructed file.
 * \param package - vector<P>& - Contains all the data for reconstructing the file
-* \param[out] fileSize - long long& - The file size
 * \param[out] crc - unsigned long& - The expected CRC value
 * \return char* : The reconstructed file.
 */
-char* Server::RebuildFile(vector<P>& package, long long& fileSize, unsigned long& crc)
+char* Server::RebuildFile(vector<P>& package, unsigned long& crc)
 {
 	// Rebuilding the entire file... using the package
 	int indexCount = 0;
 	int packageSize = package.size();
 
 	// 1. The 1st element is file size
-	long long sizeOfFile = atoll((char *)package[0].data);
-	fileSize = sizeOfFile;
+	long64_t sizeOfFile = atoll((char *)package[0].data);
+	SetFileSize(sizeOfFile);
 
 	// 2. The 2nd element is the remaining bytes
 	int leftOver = atoi((char *)package[1].data);
@@ -289,10 +315,10 @@ char* Server::RebuildFile(vector<P>& package, long long& fileSize, unsigned long
 	if (packageSize > 4)
 	{
 		// The rest of the index is the file contents
-		// NOTE: The size of these packets will always be 256
+		// NOTE: The size of these packets will always be kPacketSize
 		for (int i = 3; i < packageSize - 1; ++i)
 		{
-			for (int j = 0; j < 255; ++j)
+			for (int j = 0; j < (kPacketSize - 1); ++j)
 			{
 				output[indexCount] = package[i].data[j];
 				++indexCount;
@@ -321,9 +347,8 @@ char* Server::RebuildFile(vector<P>& package, long long& fileSize, unsigned long
 * \param expected - unsigned long - The expected CRC value
 * \return None
 */
-void Server::CRCTest(char* buffer, const long long bufferSize, unsigned long expected)
+void Server::CRCTest(char* buffer, const long long bufferSize)
 {
-	CRC crc;
 	unsigned long checkSum = 0L;
 
 	// Applying the CRCd
@@ -331,19 +356,7 @@ void Server::CRCTest(char* buffer, const long long bufferSize, unsigned long exp
 	checkSum = crc.CalculateBufferCRC(bufferSize, checkSum, buffer);
 	// Bit-invert
 	checkSum = ~checkSum;
-
-	printf("\n");
-	printf(">> Actual CRC32 is %08lX\n", checkSum);
-	printf(">> Expected CRC32 is %08lX\n", expected);
-
-	if (checkSum == expected)
-	{
-		printf(" >> PASSED\n");
-	}
-	else
-	{
-		printf(" >> FAILED\n");
-	}
+	crc.SetCheckSum(checkSum);
 }
 
 
@@ -377,4 +390,77 @@ void Server::ShowStats(void)
 		rtt * 1000.0f, sent_packets, acked_packets, lost_packets,
 		sent_packets > 0.0f ? (float)lost_packets / (float)sent_packets * 100.0f : 0.0f,
 		sent_bandwidth, acked_bandwidth);
+}
+
+
+/**
+* \brief Show the data results.
+* \param milli - int - The elapsed milliseconds for how long it took to receive the data
+* \param expectedCRC - unsigned long - The expected CRC checksum to compare against the actual checksum
+* \return None
+*/
+void Server::DisplayResults(int milli, unsigned long expectedCRC)
+{
+	unsigned long actualCRC = crc.GetCheckSum();
+
+	float sec = (float)milli / 1000.0f;
+	// Calculate the speed (Bytes per second)
+	float speedBytes = GetFileSize() / sec;
+	// Calculate the speed (bits per second)
+	float speedBits = (GetFileSize() * 8) / sec;
+
+	printf("\n");
+	printf("---------------------------------\n");
+	// Displaying the transmission speed
+	printf("File size: %lld bytes (%.3f kB)\n", GetFileSize(), (float)(GetFileSize() / 1000.0f));
+	printf("Total receive time: %d ms (%.1f s)\n", milli, sec);
+	printf("Approx. transfer speed: %.1f B/s (%.1f kB/s) (%.1f bps) (%.3f kbps)\n", 
+		speedBytes, speedBytes / 1000.0f, speedBits, speedBits / 1000.0f);
+
+	// Displaying the CRC results
+	printf("\n");
+	printf(">> Actual CRC32 is %08lX\n", actualCRC);
+	printf(">> Expected CRC32 is %08lX\n", expectedCRC);
+
+	if (actualCRC == expectedCRC) {
+		printf(" >> PASSED\n");
+	}
+	else {
+		printf(" >> FAILED\n");
+	}
+
+	printf("---------------------------------\n");
+	printf("\n");
+}
+
+
+
+//---------------------------------
+//=======================
+// ACCESSORS
+//=======================
+/**
+* \brief Get the file size.
+* \param None
+* \return long4_t : The file size.
+*/
+long64_t Server::GetFileSize(void) const
+{
+	return fileSize;
+}
+
+
+
+//---------------------------------
+//=======================
+// MUTATORS
+//=======================
+/**
+* \brief Set the file size.
+* \param None
+* \return None
+*/
+void Server::SetFileSize(long64_t size)
+{
+	this->fileSize = size;
 }

@@ -32,6 +32,8 @@ private:
 	unsigned long CRCTable[CRC32_ARRAY];	//!< Tabled used for CRC calculations. BuildCRCTable() is called first
 											//!< to initialize the CRC correctly
 
+	unsigned long checkSum;					//!< Contains a checksum of the most recent CRC
+
 public:
 
 	/*-Constructors-*/
@@ -46,6 +48,14 @@ public:
 	//------------------
 	void BuildCRCTable(void);
 	unsigned long CalculateBufferCRC(unsigned long long count, unsigned long crc, void *buffer);
+
+	/*-Accessors-*/
+	//------------------
+	unsigned long GetCheckSum(void) const;
+
+	/*-Mutators-*/
+	//------------------
+	void SetCheckSum(unsigned long sum);
 };
 
 #endif //!__CRC_H__

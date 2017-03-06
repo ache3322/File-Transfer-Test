@@ -18,7 +18,7 @@
 //=============================
 // CONSTANTS
 //=============================
-#define kPacketSize		256
+#define kPacketSize		1024
 #define kProtocolId		0x11223344
 
 

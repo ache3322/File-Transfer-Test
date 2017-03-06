@@ -21,6 +21,12 @@ using namespace std;
 
 
 //=============================
+// TYPEDEF DEFINITIONS
+//=============================
+typedef unsigned long long long64_t;
+
+
+//=============================
 // SERVER CONSTANTS
 //=============================
 #define kDefaultPort		13336
@@ -54,9 +60,12 @@ private:
 
 	Address address;					//!< The address (IPv4 and port) for the server
 	ReliableConnection connection;		//!< The connection for listening for incoming data
+	CRC crc;							//!< CRC object contains implementation to perform CRC (Cylic Redundancy Check)
 
 	string serverIP;					//!< The IPv4 address of the server
 	int serverPort;						//!< The port of the server
+
+	long64_t fileSize;					//!< The size of the file (bytes)
 
 
 	//=============================
@@ -81,12 +90,21 @@ public:
 	/*-Server-Entry-*/
 	//------------------
 	void Run(void);
-	char* RebuildFile(vector<P>& package, long long& fileSize, unsigned long& crc);
-	void CRCTest(char* buffer, const long long bufferSize, unsigned long expected = 0);
+	char* RebuildFile(vector<P>& package, unsigned long& crc);
+	void CRCTest(char* buffer, const long long bufferSize);
 
 	/*-Statistics-*/
 	//------------------
 	void ShowStats(void);
+	void DisplayResults(int milli, unsigned long expectedCRC);
+
+	/*-Accessors-*/
+	//------------------
+	long64_t GetFileSize(void) const;
+
+	/*-Mutators-*/
+	//------------------
+	void SetFileSize(long64_t size);
 };
 
 #endif // !__SERVER_H__

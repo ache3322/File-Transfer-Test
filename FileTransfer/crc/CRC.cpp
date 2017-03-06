@@ -61,3 +61,25 @@ unsigned long CRC::CalculateBufferCRC(unsigned long long count, unsigned long cr
 	}	/* end while */
 	return crc;
 }	/* end CalculateBufferCRC */
+
+
+
+//---------------------------------
+//=======================
+// ACCESSORS
+//=======================
+unsigned long CRC::GetCheckSum(void) const
+{
+	return checkSum;
+}
+
+
+
+//---------------------------------
+//=======================
+// ACCESSORS
+//=======================
+void CRC::SetCheckSum(unsigned long sum)
+{
+	this->checkSum = sum;
+}

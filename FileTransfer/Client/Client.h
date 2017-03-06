@@ -19,6 +19,11 @@ using namespace std;
 #ifndef __CLIENT_H__
 #define __CLIENT_H__
 
+//=============================
+// TYPEDEF DEFINITIONS
+//=============================
+typedef unsigned long long long64_t;
+
 
 //=============================
 // STRUCT DEFINITIONS
@@ -49,10 +54,14 @@ class Client
 private:
 
 	Address address;					//!< The address (IPv4 and port) for the client
-	ReliableConnection connection;		//!<
+	ReliableConnection connection;		//!< The connection to the server (receiver)
+	CRC crc;							//!< CRC object contains implementation to perform CRC (Cylic Redundancy Check)
 
-	string clientIP;					//!< The IPv4 address of the client
+	string targetIP;					//!< The IPv4 address of the client
 	int clientPort;						//!< The port of the client
+
+	string fileName;					//!< The filename that is being sent
+	long64_t fileSize;					//!< The size of the file (bytes)
 
 
 	//=============================
@@ -83,6 +92,17 @@ public:
 	/*-Statistics-*/
 	//------------------
 	void ShowStats(void);
+	void DisplayResults(int milli, float rtt, float sentBandwidth);
+
+	/*-Accessors-*/
+	//------------------
+	string GetFileName(void) const;
+	long64_t GetFileSize(void) const;
+
+	/*-Mutators-*/
+	//------------------
+	void SetFileName(string& name);
+	void SetFileSize(long64_t size);
 };
 
 #endif // !__CLIENT_H__
